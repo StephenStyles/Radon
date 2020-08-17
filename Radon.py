@@ -56,3 +56,21 @@ n=10000
     
 counts = expcount(n,1/DC1Lambda) + expcount(n,1/DC2Lambda)
 gen_inputs(n,1,2)
+
+def get_inputs(*args):
+    inputs = [[0]]*12
+    times = [0,15,30,45,60,75,90,105,120,135,150,165,180]
+    for i in range(12):
+        inputs[i] = inputs[i]+(np.exp(-args[0]*times[i+1])-np.exp(-args[0]*times[i]))
+        progeny_sum = 0
+        for r in range(len(args)):
+            tmp=1
+            for q in range(len(args)):
+                if q==r:
+                    continue
+                tmp *= args[q]/(args[q]-args[r])
+            progeny_sum = progeny_sum + tmp*(np.exp(-args[r]*times[i+1])-np.exp(-args[r]*times[i]))
+        inputs[i] = inputs[i]+progeny_sum
+    return inputs
+        
+get_inputs(4,5)
