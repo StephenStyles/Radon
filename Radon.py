@@ -9,18 +9,17 @@ import numpy as np
 import numpy.random as rnd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
 
 LRn222 = 3.825 * 24 * 60 * 60  # the half-life for Rn-222 (in seconds)
 LPo218 = 3.05 * 60  # the half-life for Po-218
 DC1HL = np.array([LRn222, LPo218])
 DC1Lambda = np.log(2) / DC1HL  # the decay constants for this first decay chain in units of 1/min
-DC1Lambda
 
 LRn220 = 54.5  # the half-life for Rn-220 (in seconds)
 LPo216 = 0.158  # the half-life for Po-216
 DC2HL = np.array([LRn220, LPo216])
 DC2Lambda = np.log(2) / DC2HL  # the decay constants for this first decay chain in units of 1/min
-DC2Lambda
 
 
 def gen_inputs(*rates):
@@ -49,11 +48,18 @@ def expcount(n, *args):
     return countlist
 
 
-n = 10000
-k = 2
-counts = np.array(expcount(n, *(1 / DC2Lambda)))
-for _ in range(k - 1):
-    counts += np.array(expcount(n, *(1 / DC2Lambda)))  # + expcount(n,*(1/DC1Lambda))
+k = 10
+n1_est = [0] * k
+n2_est = [0] * k
+for i in range(k):
+    n1 = 100000
+    n2 = 50000
+    counts = np.array(expcount(n1, *(1 / DC1Lambda))) + np.array(expcount(n2, *(1 / DC2Lambda)))
+    input1 = gen_inputs(*DC1Lambda)
+    input2 = gen_inputs(*DC2Lambda)
 
-counts = counts / k
-print([t for t in zip(counts, gen_inputs(*DC2Lambda))])
+    inputs = np.transpose(np.vstack((input1, input2)))
+    estimated_amounts = LinearRegression(fit_intercept=False).fit(inputs, counts)
+    n1_est[i], n2_est[i] = estimated_amounts.coef_
+print(n1_est)
+print(n2_est)
