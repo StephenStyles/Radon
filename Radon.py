@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
 Created on Mon Aug 17 09:57:47 2020
@@ -10,6 +11,10 @@ import numpy.random as rnd
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+import threading
+import concurrent.futures
+import logging
+import time
 
 LRn222 = 3.825 * 24 * 60 * 60  # the half-life for Rn-222 (in seconds)
 LPo218 = 3.05 * 60  # the half-life for Po-218
@@ -22,12 +27,7 @@ LPo216 = 0.158  # the half-life for Po-216
 DC2HL = np.array([LRn220, LPo216])
 DC2Lambda = np.log(2) / DC2HL  # the decay constants for this first decay chain in units of 1/min
 
-time_to_run = 900;
-sample_time = 15;
-n_samples = time_to_run // sample_time;
-
-
-def gen_inputs(*rates):
+def gen_inputs(sample_time, n_samples, *rates):
     proportions = [[0] * 3 for _ in range(n_samples)]
     for i in range(n_samples):
         for j in range(len(rates)):
@@ -36,56 +36,59 @@ def gen_inputs(*rates):
                 for q in range(j + 1):
                     if q != r:
                         tmp *= rates[q] / (rates[q] - rates[r])
-                tmp *= np.exp(-rates[r] * i) - np.exp(-rates[r] * (i + 1))
+                tmp *= np.exp(-rates[r] * i * sample_time) - np.exp(-rates[r] * (i + 1) * sample_time)
                 proportions[i][j] += tmp
-    inputs = [sum(p) for p in proportions]
-    return inputs  # /inputs[0]
+    return [sum(p) for p in proportions]
 
 
-def expcount(n, *args):
+def expcount(n, sample_time, n_samples, *args):
     countlist = np.array([0] * n_samples)
 
     for _ in range(n):
-        templist = [int(x) for x in np.cumsum([rnd.exponential(a) for a in args])]
+        templist = [int(x)//sample_time for x in np.cumsum([rnd.exponential(a) for a in args])]
 
         for j in templist:
             if j < len(countlist):
                 countlist[j] = countlist[j] + 1
     return countlist
 
+def runtrial_thread(args):
+    logging.info("Thread %s: starting", args[0])
+    runtrial(*(args[1:]))
 
-time_to_run = 60;
-sample_time = 15;
-n_samples = time_to_run // sample_time;
+def runtrial(st,tt,i,j):
+    ns = tt//st
+    in_rn222=gen_inputs(st,ns,*DC1Lambda)
+    in_rn220=gen_inputs(st,ns,*DC2Lambda)
+    rn222_est=[0]*10
+    rn220_est=[0]*10
+    for k in range(10):
+        out=np.array(expcount(100000,st,ns,*(1/DC1Lambda)))+np.array(expcount(50000,st,ns,*(1/DC2Lambda)))
+        lr=LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))),out)
+        rn222_est[k],rn220_est[k] = lr.coef_
+    print("st: {}s, tt: {}s, Rn222 => mean: {:1f}, std: {:1f}".format(st,tt,np.mean(rn222_est),np.std(rn222_est)))
+    print("st: {}s, tt: {}s, Rn220 => mean: {:1f}, std: {:1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
+    rn222_mean[i][j] = np.mean(rn222_est)
+    rn222_stdv[i][j] = np.std(rn222_est)
+    rn220_mean[i][j] = np.mean(rn220_est)
+    rn220_stdv[i][j] = np.std(rn220_est)
 
-k = 5
-n1_mean = [[0] * 15 for _ in range(60)]
-n1_stdv = [[0] * 15 for _ in range(60)]
-n2_mean = [[0] * 15 for _ in range(60)]
-n2_stdv = [[0] * 15 for _ in range(60)]
+if __name__ == "__main__":
+    format = "%(asctime)s: %(message)s"
+    logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-for i in range(60):
-    sample_time = i + 1
-    for j in range(15):
-        time_to_run = 60 * (j + 1)
-        n_samples = time_to_run // sample_time;
-        n1_est = []
-        n2_est = []
-        for _ in range(k):
-            n1 = 100000
-            n2 = 50000
-            counts = np.array(expcount(n1, *(1 / DC1Lambda))) + np.array(expcount(n2, *(1 / DC2Lambda)))
-            input1 = gen_inputs(*DC1Lambda)
-            input2 = gen_inputs(*DC2Lambda)
+    rn222_mean = [[0] * 15 for _ in range(60)]
+    rn222_stdv = [[0] * 15 for _ in range(60)]
+    rn220_mean = [[0] * 15 for _ in range(60)]
+    rn220_stdv = [[0] * 15 for _ in range(60)]
 
-            inputs = np.transpose(np.vstack((input1, input2)))
-            estimated_amounts = LinearRegression(fit_intercept=False).fit(inputs, counts)
-            n1_est.append(estimated_amounts.coef_[0])
-            n2_est.append(estimated_amounts.coef_[1])
-        n1_mean[i][j] = np.mean(n1_est)
-        n1_stdv[i][j] = np.std(n1_est)
-        n2_mean[i][j] = np.mean(n2_est)
-        n2_mean[i][j] = np.std(n2_est)
-        print("With sample time {}s and run time {}s:".format(sample_time, time_to_run))
-        print("\tThe mean for Rn222 is {0} with standard deviation {1}".format(np.mean(n1_est), np.std(n1_est)))
-        print("\tThe mean for Rn220 is {0} with standard deviation {1}".format(np.mean(n2_est), np.std(n2_est)))
+    jobs = [(i,i%60+1,60*(i//60+1),i%60,i//60) for i in range(60*15)]
+    threads = list()
+    for job in jobs:
+        logging.info("Main\t: create and start thread %d", job[0])
+        if(len(threads) >= 11):
+            threads[0].join()
+            threads.pop(0)
+        x = threading.Thread(target=runtrial_thread,args=(job,))
+        threads.append(x)
+        x.start()
