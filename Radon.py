@@ -18,21 +18,32 @@ import time
 import os
 import csv
 
-LRn222 = 3.825 * 24 * 60 * 60  # the half-life for Rn-222 (in seconds)
-LPo218 = 3.05 * 60  # the half-life for Po-218
-LPb210 = (26.8 * 60) + (19.7 * 60) + (1.5e-4)  # the half-lives for Pb-214, Bi-214, and Po-214
-DC1HL = np.array([LRn222, LPo218])
+LRn222 = 3.8235 * 24 * 60 * 60  # the half-life for Rn-222 (in seconds)
+LPo218 = 3.098 * 60  # the half-life for Po-218
+LPb214 = 26.8 * 60 # the half-life for Pb-214
+LBi214 = 19.9 * 60 # the half-life for Bi-214
+LPo214 = 164.3e-6 # the half-life for Po-214
+DC1HL = np.array([LRn222, LPo218,LPb214,LBi214,LPo214])
+DC1AD = np.array([     1,      1,     0,     0,     1])
 DC1Lambda = np.log(2) / DC1HL  # the decay constants for this first decay chain in units of 1/min
 
-LRn220 = 54.5  # the half-life for Rn-220 (in seconds)
-LPo216 = 0.158  # the half-life for Po-216
-DC2HL = np.array([LRn220, LPo216])
+
+LRn220 = 55.6  # the half-life for Rn-220 (in seconds)
+LPo216 = 0.145  # the half-life for Po-216
+LPb212 = 10.64 * 60 * 60 # the half-life for Pb-212
+LBi212 = 60.55 * 60 # the half-life for Bi-212
+# Technically, Bi-212 can both alpha and beta decay, but the beta decay mode then alpha decays almost immediately
+DC2HL = np.array([LRn220, LPo216,LPb212,LBi212])
+DC2AD = np.array([     1,      1,     0,     1])
 DC2Lambda = np.log(2) / DC2HL  # the decay constants for this first decay chain in units of 1/min
 
 max_threads = len(os.sched_getaffinity(0))
 thread_pool = threading.BoundedSemaphore(max_threads)
 
-def gen_inputs(sample_time, n_samples, *rates):
+
+def gen_inputs(sample_time, n_samples, *rates, counts=None):
+    if counts is None:
+        counts = [1] * len(rates)
     proportions = [[0] * 3 for _ in range(n_samples)]
     for i in range(n_samples):
         for j in range(len(rates)):
@@ -42,7 +53,7 @@ def gen_inputs(sample_time, n_samples, *rates):
                     if q != r:
                         tmp *= rates[q] / (rates[q] - rates[r])
                 tmp *= np.exp(-rates[r] * i * sample_time) - np.exp(-rates[r] * (i + 1) * sample_time)
-                proportions[i][j] += tmp
+                proportions[i][j] += tmp*counts[j]
     return [sum(p) for p in proportions]
 
 
@@ -92,9 +103,6 @@ if __name__ == "__main__":
     threads = list()
     for job in jobs:
         logging.info("Main\t: create and start thread %d", job[0])
-        # if(len(threads) >= 11):
-        #     threads[0].join()
-        #     threads.pop(0)
         x = threading.Thread(target=runtrial_thread,args=(job,))
         threads.append(x)
         x.start()
