@@ -44,7 +44,7 @@ thread_pool = threading.BoundedSemaphore(max_threads)
 def gen_inputs(sample_time, n_samples, *rates, counts=None):
     if counts is None:
         counts = [1] * len(rates)
-    proportions = [[0] * 3 for _ in range(n_samples)]
+    proportions = [[0] * len(rates) for _ in range(n_samples)]
     for i in range(n_samples):
         for j in range(len(rates)):
             for r in range(j + 1):
@@ -83,8 +83,9 @@ def runtrial(st,tt,i,j):
         out=np.array(expcount(100000,st,ns,*(1/DC1Lambda)))+np.array(expcount(50000,st,ns,*(1/DC2Lambda)))
         lr=LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))),out)
         rn222_est[k],rn220_est[k] = lr.coef_
-    print("st: {}s, tt: {}s, Rn222 => mean: {:1f}, std: {:1f}".format(st,tt,np.mean(rn222_est),np.std(rn222_est)))
-    print("st: {}s, tt: {}s, Rn220 => mean: {:1f}, std: {:1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
+    print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
+    print("st: {}s, tt: {}s, Rn220 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
+    print("st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est/rn220_est), np.std(rn222_est/rn220_est)))
     rn222_mean[i][j] = np.mean(rn222_est)
     rn222_stdv[i][j] = np.std(rn222_est)
     rn220_mean[i][j] = np.mean(rn220_est)
@@ -94,12 +95,15 @@ if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-    rn222_mean = [[0] * 15 for _ in range(60)]
-    rn222_stdv = [[0] * 15 for _ in range(60)]
-    rn220_mean = [[0] * 15 for _ in range(60)]
-    rn220_stdv = [[0] * 15 for _ in range(60)]
+    n_period_grid = 1
+    n_time_grid = 10
 
-    jobs = [(i,i%60+1,60*(i//60+1),i%60,i//60) for i in range(60*15)]
+    rn222_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
+    rn222_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
+    rn220_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
+    rn220_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
+
+    jobs = [(i,i%n_period_grid+15,10*60*60*(i//n_period_grid+1),i%n_period_grid,i//n_period_grid) for i in range(t_time_grid*n_period_grid)]
     threads = list()
     for job in jobs:
         logging.info("Main\t: create and start thread %d", job[0])
