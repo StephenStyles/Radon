@@ -15,6 +15,8 @@ import threading
 import concurrent.futures
 import logging
 import time
+import os
+import csv
 
 LRn222 = 3.825 * 24 * 60 * 60  # the half-life for Rn-222 (in seconds)
 LPo218 = 3.05 * 60  # the half-life for Po-218
@@ -26,6 +28,9 @@ LRn220 = 54.5  # the half-life for Rn-220 (in seconds)
 LPo216 = 0.158  # the half-life for Po-216
 DC2HL = np.array([LRn220, LPo216])
 DC2Lambda = np.log(2) / DC2HL  # the decay constants for this first decay chain in units of 1/min
+
+max_threads = len(os.sched_getaffinity(0))
+thread_pool = threading.BoundedSemaphore(max_threads)
 
 def gen_inputs(sample_time, n_samples, *rates):
     proportions = [[0] * 3 for _ in range(n_samples)]
@@ -53,8 +58,9 @@ def expcount(n, sample_time, n_samples, *args):
     return countlist
 
 def runtrial_thread(args):
-    logging.info("Thread %s: starting", args[0])
-    runtrial(*(args[1:]))
+    with thread_pool:
+        logging.info("Thread %s: starting", args[0])
+        runtrial(*(args[1:]))
 
 def runtrial(st,tt,i,j):
     ns = tt//st
@@ -86,9 +92,23 @@ if __name__ == "__main__":
     threads = list()
     for job in jobs:
         logging.info("Main\t: create and start thread %d", job[0])
-        if(len(threads) >= 11):
-            threads[0].join()
-            threads.pop(0)
+        # if(len(threads) >= 11):
+        #     threads[0].join()
+        #     threads.pop(0)
         x = threading.Thread(target=runtrial_thread,args=(job,))
         threads.append(x)
         x.start()
+    for t in threads:
+        t.join()
+    with open("rn222_mean.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(rn222_mean)
+    with open("rn222_std.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(rn222_stdv)
+    with open("rn220_mean.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(rn220_mean)
+    with open("rn220_std.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(rn220_stdv)
