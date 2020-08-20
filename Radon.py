@@ -80,12 +80,13 @@ def runtrial(st,tt,i,j):
     rn222_est=[0]*10
     rn220_est=[0]*10
     for k in range(10):
-        out=np.array(expcount(100000,st,ns,*(1/DC1Lambda)))+np.array(expcount(50000,st,ns,*(1/DC2Lambda)))
+        out=np.array(expcount(300000,st,ns,*(1/DC1Lambda)))+np.array(expcount(50,st,ns,*(1/DC2Lambda)))
         lr=LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))),out)
         rn222_est[k],rn220_est[k] = lr.coef_
     print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
     print("st: {}s, tt: {}s, Rn220 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
-    print("st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est/rn220_est), np.std(rn222_est/rn220_est)))
+    ratio_est = np.array(rn222_est)/np.array(rn220_est)
+    print("st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(ratio_est), np.std(ratio_est)))
     rn222_mean[i][j] = np.mean(rn222_est)
     rn222_stdv[i][j] = np.std(rn222_est)
     rn220_mean[i][j] = np.mean(rn220_est)
@@ -95,15 +96,19 @@ if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-    n_period_grid = 1
+    n_period_grid = 3
+    n_period_start = 5
+    n_period_step = 5
     n_time_grid = 10
+    n_time_start = 1*60
+    n_time_step = 1*60
 
     rn222_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
     rn222_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
     rn220_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
     rn220_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
 
-    jobs = [(i,i%n_period_grid+15,10*60*60*(i//n_period_grid+1),i%n_period_grid,i//n_period_grid) for i in range(t_time_grid*n_period_grid)]
+    jobs = [(i,(i%n_period_grid)*n_period_step+n_period_step,n_time_step*(i//n_period_grid)+n_time_start,i%n_period_grid,i//n_period_grid) for i in range(n_time_grid*n_period_grid)]
     threads = list()
     for job in jobs:
         logging.info("Main\t: create and start thread %d", job[0])
