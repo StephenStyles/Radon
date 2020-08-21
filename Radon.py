@@ -59,13 +59,14 @@ def gen_inputs(sample_time, n_samples, *rates, counts=None):
 
 def expcount(n, sample_time, n_samples, *args):
     countlist = np.array([0] * n_samples)
+    gen=rnd.default_rng()
 
-    for _ in range(n):
-        templist = [int(x)//sample_time for x in np.cumsum([rnd.exponential(a) for a in args])]
+    decays = np.cumsum(gen.exponential(args,(n_samples,len(args))),1)
+    decays = decays//sample_time
 
-        for j in templist:
-            if j < len(countlist):
-                countlist[j] = countlist[j] + 1
+    for i in decays.flatten():
+        if int(i) < len(countlist):
+            countlist[int(i)] += 1
     return countlist
 
 def runtrial_thread(args):
@@ -80,7 +81,7 @@ def runtrial(st,tt,i,j):
     rn222_est=[0]*10
     rn220_est=[0]*10
     for k in range(10):
-        out=np.array(expcount(300000,st,ns,*(1/DC1Lambda)))+np.array(expcount(50,st,ns,*(1/DC2Lambda)))
+        out=np.array(expcount(1000000,st,ns,*(1/DC1Lambda)))+np.array(expcount(1000//6,st,ns,*(1/DC2Lambda)))
         lr=LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))),out)
         rn222_est[k],rn220_est[k] = lr.coef_
     print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
@@ -96,10 +97,10 @@ if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-    n_period_grid = 3
-    n_period_start = 5
-    n_period_step = 5
-    n_time_grid = 10
+    n_period_grid = 60
+    n_period_start = 1
+    n_period_step = 1
+    n_time_grid = 60*24
     n_time_start = 1*60
     n_time_step = 1*60
 
