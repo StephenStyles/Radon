@@ -57,17 +57,32 @@ def gen_inputs(sample_time, n_samples, *rates, counts=None):
     return [sum(p) for p in proportions]
 
 
-def expcount(n, sample_time, n_samples, *args):
+def expcount(n, sample_time, n_samples, *args, counts=None):
+    if counts is None:
+        counts = [1] * len(args)
     countlist = np.array([0] * n_samples)
     gen=rnd.default_rng()
-
-    decays = np.cumsum(gen.exponential(args,(n_samples,len(args))),1)
-    decays = decays//sample_time
-
+    indices = [i for i, c in enumerate(counts) if c == 1]
+    decays = np.cumsum(gen.exponential(args,(n,len(args))),1)
+    decays = decays[:, indices]//sample_time
     for i in decays.flatten():
         if int(i) < len(countlist):
             countlist[int(i)] += 1
     return countlist
+
+def exp_state(init_state, interval, rates, counts=None):
+    if counts is None:
+        counts = np.array([1] * len(init_state))
+    if len(init_state) != len(rates) or len(init_state) != len(counts):
+        raise Exception("Length of state, rates, and counts must match")
+    count = np.array([0]*len(init_state))
+    gen = rnd.default_rng()
+    for type in range(len(init_state)):
+        decays = gen.exponential(1/(rates[type:]),(init_state[type],len(rates)-type))
+        count[type:] += np.sum(np.cumsum(decays,1)<interval,0)
+    state = np.array(init_state) - count
+    state[1:] += count[0:-1]
+    return state, np.dot(count, counts)
 
 def runtrial_thread(args):
     with thread_pool:
@@ -100,7 +115,7 @@ if __name__ == "__main__":
     n_period_grid = 60
     n_period_start = 1
     n_period_step = 1
-    n_time_grid = 60*24
+    n_time_grid = 1
     n_time_start = 1*60
     n_time_step = 1*60
 
