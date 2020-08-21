@@ -44,18 +44,18 @@ thread_pool = threading.BoundedSemaphore(max_threads)
 def gen_inputs(sample_time, n_samples, *rates, counts=None):
     if counts is None:
         counts = [1] * len(rates)
-    proportions = [[0] * len(rates) for _ in range(n_samples)]
-    for i in range(n_samples):
-        for j in range(len(rates)):
-            for r in range(j + 1):
-                tmp = 1
-                for q in range(j + 1):
-                    if q != r:
-                        tmp *= rates[q] / (rates[q] - rates[r])
-                tmp *= np.exp(-rates[r] * i * sample_time) - np.exp(-rates[r] * (i + 1) * sample_time)
-                proportions[i][j] += tmp*counts[j]
-    return [sum(p) for p in proportions]
-
+    exp_rates = [[0] * len(rates) for _ in range(n_samples)]
+    for t_i in range(n_samples):
+        for i in range(len(rates)):
+            for j in range(i,len(rates)):
+                for r in range(i,j+1):
+                    tmp = 1
+                    for q in range(i,j+1):
+                        if q != r:
+                            tmp *= rates[q] / (rates[q] - rates[r])
+                    tmp *= np.exp(-rates[r] * sample_time * t_i) - np.exp(-rates[r] * sample_time * (t_i + 1))
+                    exp_rates[t_i][i] += tmp*counts[j]
+    return exp_rates
 
 def expcount(n, sample_time, n_samples, *args, counts=None):
     if counts is None:
