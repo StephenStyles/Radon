@@ -25,7 +25,7 @@ LBi214 = 19.9 * 60 # the half-life for Bi-214
 LPo214 = 164.3e-6 # the half-life for Po-214
 DC1HL = np.array([LRn222, LPo218,LPb214,LBi214,LPo214])
 DC1AD = np.array([     1,      1,     0,     0,     1])
-DC1Lambda = np.log(2) / DC1HL  # the decay constants for this first decay chain in units of 1/min
+DC1Lambda = np.log(2) / DC1HL  # the decay constants for this first decay chain in units of Hz
 
 
 LRn220 = 55.6  # the half-life for Rn-220 (in seconds)
@@ -35,18 +35,28 @@ LBi212 = 60.55 * 60 # the half-life for Bi-212
 # Technically, Bi-212 can both alpha and beta decay, but the beta decay mode then alpha decays almost immediately
 DC2HL = np.array([LRn220, LPo216,LPb212,LBi212])
 DC2AD = np.array([     1,      1,     0,     1])
-DC2Lambda = np.log(2) / DC2HL  # the decay constants for this first decay chain in units of 1/min
+DC2Lambda = np.log(2) / DC2HL  # the decay constants for this first decay chain in units of Hz
 
 max_threads = len(os.sched_getaffinity(0))
 thread_pool = threading.BoundedSemaphore(max_threads)
 
-
-def gen_inputs(sample_time, n_samples, *rates, counts=None):
-    if counts is None:
-        counts = [1] * len(rates)
+# This function generates the expected number of counts in each sample period, as a proportion of the initial
+# amount of the radioactive substance, starting from each point in the decay chain
+# Parameters
+## sample_time: Duration of each sample period
+## n_samples: Overall number of sample periods
+## rates: The decay rates (λ) for each isotope in the decay chain
+## α_decay: The number of alpha particles emitted when this isotope decays
+def gen_inputs(sample_time, n_samples, rates, α_decay=None):
+    if α_decay is None:
+        # If alpha decay information is omitted, assume all decays are alpha decays
+        α_decay = [1] * len(rates)
     exp_rates = [[0] * len(rates) for _ in range(n_samples)]
     for t_i in range(n_samples):
+        # t_i -> index of the sample period
         for i in range(len(rates)):
+            # i -> starting isotope
+            # The following all comes from Edward's DEQ solution
             for j in range(i,len(rates)):
                 for r in range(i,j+1):
                     tmp = 1
@@ -54,35 +64,96 @@ def gen_inputs(sample_time, n_samples, *rates, counts=None):
                         if q != r:
                             tmp *= rates[q] / (rates[q] - rates[r])
                     tmp *= np.exp(-rates[r] * sample_time * t_i) - np.exp(-rates[r] * sample_time * (t_i + 1))
-                    exp_rates[t_i][i] += tmp*counts[j]
+
+                    exp_rates[t_i][i] += tmp*α_decay[j]
     return exp_rates
 
-def expcount(n, sample_time, n_samples, *args, counts=None):
-    if counts is None:
-        counts = [1] * len(args)
-    countlist = np.array([0] * n_samples)
-    gen=rnd.default_rng()
-    indices = [i for i, c in enumerate(counts) if c == 1]
-    decays = np.cumsum(gen.exponential(args,(n,len(args))),1)
+# This function generates sample data for a decay chain using the exponential distribution of each isotope in the chain
+# Parameters
+## n: number of particles of the first isotope in the chain. All other isotopes are assumed to not be present at time
+##    t = 0
+## sample_time: Duration of each sample period
+## n_samples: Overall number of sample periods
+## rates: The decay rates (λ) for each isotope in the decay chain
+## α_decay: The number of alpha particles emitted when this isotope decays
+def expcount(n, sample_time, n_samples, rates, α_decay=None):
+    if α_decay is None:
+        # If alpha decay information is omitted, assume all decays are alpha decays
+        α_decay = [1] * len(rates)
+    countlist = np.array([0] * n_samples) # Stores the counted decays in each sample period
+    gen=rnd.default_rng() # newest method for using numpy.random
+    indices = [i for i, c in enumerate(α_decay) if c == 1] # Which columns correspond to alpha decays?
+    decays = np.cumsum(gen.exponential(1/rates,(n,len(rates))),1) # Determine what time each decay in the chain occurs
+    # gen.exponential(1/rates) produces the decay intervals for a single particle. The second argument to
+    # gen.exponential is a size tuple, which specifies that from each exponential distribution, n samples should be
+    # drawn. This corresponds to having n particles of the starting isotope, then determining for each particle
+    # the decay intervals along the decay chain. Doing a cumulative sum of these intervals gives the time at which each
+    # decay occurs.
     decays = decays[:, indices]//sample_time
-    for i in decays.flatten():
+    # Discard the non-alpha decays, and determine which sample period each decay would occur in
+    for i in decays.flatten(): # All decays remaining are alpha, and have no particular order
         if int(i) < len(countlist):
+            # If the particle decays in one of our samples, then we count it. If it decays after we finish sampling, we
+            # don't count it.
             countlist[int(i)] += 1
     return countlist
 
-def exp_state(init_state, interval, rates, counts=None):
-    if counts is None:
-        counts = np.array([1] * len(init_state))
-    if len(init_state) != len(rates) or len(init_state) != len(counts):
+# This function generates sample data for a decay chain using the exponential distribution of each isotope in the chain
+# This differs from the function above because it keeps track of which particles have decayed at each time step
+# Parameters
+## n: number of particles of the first isotope in the chain. All other isotopes are assumed to not be present at time
+##    t = 0
+## sample_time: Duration of each sample period
+## n_samples: Overall number of sample periods
+## rates: The decay rates (λ) for each isotope in the decay chain
+## α_decay: The number of alpha particles emitted when this isotope decays
+def exp_count(n, sample_time, n_samples, rates, α_decay=None, init_state=None):
+    if α_decay is None:
+        # If alpha decay information is omitted, assume all decays are alpha decays
+        α_decay = [1] * len(rates)
+    countlist = np.array([0] * n_samples) # Stores the counted decays in each sample period
+    state = [0]*len(rates)  # Stores the current number of each type of particle
+    state[0] = n # Starting with n particles of first isotope, and no progeny
+    for i in range(n_samples):
+        # For each sample period, determine the state at the end of the sample period and the counts seen during this
+        # sample period.
+        state, countlist[i] = exp_state(state,sample_time,rates, α_decay)
+    return countlist
+
+# This function generates a sample data for a single interval for a decay chain using the exponential
+# distribution of each isotope in the chain.
+# Parameters
+## init_state: The initial state of the system (how many particles of each isotope
+## interval: The length of the interval of interest
+## rates: The decay rates (λ) for each isotope in the decay chain
+## α_decay: The number of alpha particles emitted when this isotope decays
+## Note init_state, rates, and α_decay must all be the same length and dimension
+def exp_state(init_state, interval, rates, α_decay=None):
+    if α_decay is None:
+        # If alpha decay information is omitted, assume all decays are alpha decays
+        α_decay = np.array([1] * len(init_state))
+    if len(init_state) != len(rates) or len(init_state) != len(α_decay):
+        # Raise an exception if the lengths are inconsistent
         raise Exception("Length of state, rates, and counts must match")
-    count = np.array([0]*len(init_state))
-    gen = rnd.default_rng()
+    count = np.array([0]*len(init_state)) # Track how many particles of each type have decayed
+    gen = rnd.default_rng() # Set up np.random
     for type in range(len(init_state)):
+        # For each isotope in the chain, we regard it as the first isotope in its own chain, where there are no
+        # predecessors, and there is no progeny. We then determine the decay intervals along the chain for each particle
+        # we started with, and sum these intervals to determine the times of decay
+        # The shortened chain may be regarded as starting with `init_state[type]` number of particles, and having the
+        # decay rates `rates[type:]`, which includes this particle and everything after it
         decays = gen.exponential(1/(rates[type:]),(init_state[type],len(rates)-type))
         count[type:] += np.sum(np.cumsum(decays,1)<interval,0)
-    state = np.array(init_state) - count
-    state[1:] += count[0:-1]
-    return state, np.dot(count, counts)
+        # We then add to our count of how many of each particle decayed, offset so that our determined decays match
+        # with the count variable. The expression `np.cumsum(decays, 1) < interval` returns a boolean matrix, where each
+        # row is a particle and each column is a possible decay. If the entry is True, that particle has undergone that
+        # decay, because the time of decay is less than our interval. If it is false, that particle decays after our
+        # interval has ended. Summing this boolean array over the rows gives the number of particles of each type that
+        # decayed in the interval.
+    state = np.array(init_state) - count # Update the state with decay information
+    state[1:] += count[0:-1] # Each decay produces one of the next element in the chain
+    return state, np.dot(count, α_decay) # Return the state and the count of alpha decays
 
 def runtrial_thread(args):
     with thread_pool:
@@ -91,12 +162,14 @@ def runtrial_thread(args):
 
 def runtrial(st,tt,i,j):
     ns = tt//st
-    in_rn222=gen_inputs(st,ns,*DC1Lambda)
-    in_rn220=gen_inputs(st,ns,*DC2Lambda)
+    in_rn222=np.array(gen_inputs(st,ns,*DC1Lambda))
+    in_rn222=in_rn222[:,0]
+    in_rn220=np.array(gen_inputs(st,ns,*DC2Lambda))
+    in_rn220=in_rn220[:,0]
     rn222_est=[0]*10
     rn220_est=[0]*10
     for k in range(10):
-        out=np.array(expcount(1000000,st,ns,*(1/DC1Lambda)))+np.array(expcount(1000//6,st,ns,*(1/DC2Lambda)))
+        out=np.array(exp_count(1000000,st,ns,DC1Lambda))+np.array(exp_count(1000//6,st,ns,DC2Lambda))
         lr=LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))),out)
         rn222_est[k],rn220_est[k] = lr.coef_
     print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
@@ -112,7 +185,7 @@ if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-    n_period_grid = 60
+    n_period_grid = 1
     n_period_start = 1
     n_period_step = 1
     n_time_grid = 1
