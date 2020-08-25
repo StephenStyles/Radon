@@ -167,44 +167,37 @@ def runtrial_thread(args):
 
 def runtrial(st, tt, i, j):
     ns = tt // st
-    offset_in_rn222 = np.array([[0.] * 30 for _ in range(ns)])
-    offset_in_rn220 = np.array([[0.] * 30 for _ in range(ns)])
-    for i in range(30):
-        temp = np.array(gen_inputs(st, ns, DC2Lambda, α_decay=DC2AD, offset=i))
-        offset_in_rn220[:, i] = temp[:, 0]
-        temp = np.array(gen_inputs(st, ns, DC1Lambda, α_decay=DC1AD, offset=i))
-        offset_in_rn222[:, i] = temp[:, 0]
-    rn222_est = [[0] * 30 for _ in range(10)]
-    rn220_est = [[0] * 30 for _ in range(10)]
-    for k in range(1):
+    offset_n = np.ceil(90/st)
+    in_rn222 = np.array(gen_inputs(st, ns, DC1Lambda, DC1AD, offset_n))
+    in_rn220 = np.array(gen_inputs(st, ns, DC2Lambda, DC2AD, offset_n))
+    rn222_est = [0.]*10
+    rn220_est = [0.]*10
+    for k in range(10):
         out = np.array(exp_count(1000000, st, ns + 30, DC1Lambda)) + np.array(
             exp_count(1000 // 6, st, ns + 30, DC2Lambda))
         out = out[30:]
-        lr = LinearRegression(fit_intercept=False).fit(np.hstack((offset_in_rn222, offset_in_rn220)), out)
-        rn222_est[k] = lr.coef_[:30]
-        rn220_est[k] = lr.coef_[30:]
-    print(sum(rn222_est[0]))
-    print(sum(rn220_est[0]))
-    # print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
-    # print("st: {}s, tt: {}s, Rn220 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
-    # ratio_est = np.array(rn222_est)/np.array(rn220_est)
-    # print("st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(ratio_est), np.std(ratio_est)))
-    # rn222_mean[i][j] = np.mean(rn222_est)
-    # rn222_stdv[i][j] = np.std(rn222_est)
-    # rn220_mean[i][j] = np.mean(rn220_est)
-    # rn220_stdv[i][j] = np.std(rn220_est)
+        lr = LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))), out)
+        rn222_est[k], rn220_est[k] = lr.coef_
+    print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
+    print("st: {}s, tt: {}s, Rn220 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
+    ratio_est = np.array(rn222_est)/np.array(rn220_est)
+    print("st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(ratio_est), np.std(ratio_est)))
+    rn222_mean[i][j] = np.mean(rn222_est)
+    rn222_stdv[i][j] = np.std(rn222_est)
+    rn220_mean[i][j] = np.mean(rn220_est)
+    rn220_stdv[i][j] = np.std(rn220_est)
 
 
 if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-    n_period_grid = 1
+    n_period_grid = 5
     n_period_start = 3
-    n_period_step = 1
-    n_time_grid = 1
-    n_time_start = 5 * 60
-    n_time_step = 1 * 60
+    n_period_step = 3
+    n_time_grid = 25
+    n_time_start = 1 * 60
+    n_time_step = 10
 
     rn222_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
     rn222_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
@@ -215,11 +208,10 @@ if __name__ == "__main__":
              i % n_period_grid, i // n_period_grid) for i in range(n_time_grid * n_period_grid)]
     threads = list()
     for job in jobs:
-        # logging.info("Main\t: create and start thread %d", job[0])
-        # x = threading.Thread(target=runtrial_thread, args=(job,))
-        # threads.append(x)
-        # x.start()
-        runtrial_thread(job)
+        logging.info("Main\t: create and start thread %d", job[0])
+        x = threading.Thread(target=runtrial_thread, args=(job,))
+        threads.append(x)
+        x.start()
     for t in threads:
         t.join()
     with open("rn222_mean.csv", "w", newline="") as f:
