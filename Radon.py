@@ -109,7 +109,7 @@ def expcount(n, sample_time, n_samples, rates, α_decay=None):
 ## n_samples: Overall number of sample periods
 ## rates: The decay rates (λ) for each isotope in the decay chain
 ## α_decay: The number of alpha particles emitted when this isotope decays
-def exp_count(n, sample_time, n_samples, rates, α_decay=None, init_state=None):
+def exp_count(n, sample_time, n_samples, rates, α_decay=None):
     if α_decay is None:
         # If alpha decay information is omitted, assume all decays are alpha decays
         α_decay = [1] * len(rates)
@@ -167,9 +167,11 @@ def runtrial_thread(args):
 
 def runtrial(st, tt, i, j):
     ns = tt // st
-    offset_n = np.ceil(90/st)
+    offset_n = int(np.ceil(90/st))
     in_rn222 = np.array(gen_inputs(st, ns, DC1Lambda, DC1AD, offset_n))
+    in_rn222 = in_rn222[:,0]
     in_rn220 = np.array(gen_inputs(st, ns, DC2Lambda, DC2AD, offset_n))
+    in_rn220 = in_rn220[:,0]
     rn222_est = [0.]*10
     rn220_est = [0.]*10
     for k in range(10):
@@ -226,3 +228,9 @@ if __name__ == "__main__":
     with open("rn220_std.csv", "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(rn220_stdv)
+
+    sdprod = np.multiply(rn222_stdv, rn220_stdv)
+    i, j = np.unravel_index(np.argmin(sdprod), sdprod.shape)
+    print("Minimum std product found with period {}s and total sample duration {}s", i * n_period_step + n_period_step, j * n_time_step + n_time_start)
+    print("Radon-220 estimate at minimum: {:g} ± {:g}", rn220_mean[i][j], rn220_stdv[i][j])
+    print("Radon-222 estimate at minimum: {:g} ± {:g}", rn222_mean[i][j], rn222_stdv[i][j])
