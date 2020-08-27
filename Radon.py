@@ -172,17 +172,18 @@ def runtrial(st, tt, i, j):
     in_rn222 = in_rn222[:,0]
     in_rn220 = np.array(gen_inputs(st, ns, DC2Lambda, DC2AD, offset_n))
     in_rn220 = in_rn220[:,0]
-    rn222_est = [0.]*10
-    rn220_est = [0.]*10
-    for k in range(10):
-        out = np.array(exp_count(1000000, st, ns + 30, DC1Lambda)) + np.array(
-            exp_count(1000 // 6, st, ns + 30, DC2Lambda))
+    num_runs=25
+    rn222_est = [0.]*num_runs
+    rn220_est = [0.]*num_runs
+    for k in range(num_runs):
+        out = np.array(exp_count(750000, st, ns + 30, DC1Lambda, DC1AD)) + np.array(
+            exp_count(150, st, ns + 30, DC2Lambda, DC2AD))
         out = out[30:]
         lr = LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))), out)
         rn222_est[k], rn220_est[k] = lr.coef_
     print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
     print("st: {}s, tt: {}s, Rn220 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
-    ratio_est = np.array(rn222_est)/np.array(rn220_est)
+    ratio_est = np.divide(rn222_est,rn220_est)#.array(rn222_est)/np.array(rn220_est)
     print("st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(ratio_est), np.std(ratio_est)))
     rn222_mean[i][j] = np.mean(rn222_est)
     rn222_stdv[i][j] = np.std(rn222_est)
@@ -194,12 +195,12 @@ if __name__ == "__main__":
     format = "%(asctime)s: %(message)s"
     logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
 
-    n_period_grid = 5
-    n_period_start = 3
-    n_period_step = 3
-    n_time_grid = 25
+    n_period_grid = 15
+    n_period_start = 1
+    n_period_step = 1
+    n_time_grid = 109
     n_time_start = 1 * 60
-    n_time_step = 10
+    n_time_step = 5
 
     rn222_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
     rn222_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
@@ -231,6 +232,6 @@ if __name__ == "__main__":
 
     sdprod = np.multiply(rn222_stdv, rn220_stdv)
     i, j = np.unravel_index(np.argmin(sdprod), sdprod.shape)
-    print("Minimum std product found with period {}s and total sample duration {}s", i * n_period_step + n_period_step, j * n_time_step + n_time_start)
-    print("Radon-220 estimate at minimum: {:g} ± {:g}", rn220_mean[i][j], rn220_stdv[i][j])
-    print("Radon-222 estimate at minimum: {:g} ± {:g}", rn222_mean[i][j], rn222_stdv[i][j])
+    print("Minimum std product found with period {} s and total sample duration {} s".format(i * n_period_step + n_period_step, j * n_time_step + n_time_start))
+    print("Radon-220 estimate at minimum: {:.3g} ± {:.3g}".format(rn220_mean[i][j], rn220_stdv[i][j]))
+    print("Radon-222 estimate at minimum: {:.3g} ± {:.3g}".format(rn222_mean[i][j], rn222_stdv[i][j]))
