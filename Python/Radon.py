@@ -36,7 +36,7 @@ DC2HL = np.array([LRn220, LPo216, LPb212, LBi212])
 DC2AD = np.array([1, 1, 0, 1])
 DC2Lambda = np.log(2) / DC2HL  # the decay constants for this first decay chain in units of Hz
 
-max_threads = 12 # len(os.sched_getaffinity(0))
+max_threads = 12  # len(os.sched_getaffinity(0))
 thread_pool = threading.BoundedSemaphore(max_threads)
 
 
@@ -166,25 +166,29 @@ def runtrial_thread(args):
 
 
 def runtrial(st, tt, i, j):
+    global rn222_mean, rn222_stdv, rn220_mean, rn220_stdv
     ns = tt // st
-    offset_n = int(np.ceil(90/st))
+    offset_n = int(np.ceil(90 / st))
     in_rn222 = np.array(gen_inputs(st, ns, DC1Lambda, DC1AD, offset_n))
-    in_rn222 = in_rn222[:,0]
+    in_rn222 = in_rn222[:, 0]
     in_rn220 = np.array(gen_inputs(st, ns, DC2Lambda, DC2AD, offset_n))
-    in_rn220 = in_rn220[:,0]
-    num_runs=25
-    rn222_est = [0.]*num_runs
-    rn220_est = [0.]*num_runs
+    in_rn220 = in_rn220[:, 0]
+    num_runs = 25
+    rn222_est = [0.] * num_runs
+    rn220_est = [0.] * num_runs
     for k in range(num_runs):
         out = np.array(exp_count(750000, st, ns + 30, DC1Lambda, DC1AD)) + np.array(
             exp_count(150, st, ns + 30, DC2Lambda, DC2AD))
         out = out[30:]
-        lr = LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222,in_rn220))), out)
+        lr = LinearRegression(fit_intercept=False).fit(np.transpose(np.vstack((in_rn222, in_rn220))), out)
         rn222_est[k], rn220_est[k] = lr.coef_
-    print("st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est),np.std(rn222_est)))
-    print("st: {}s, tt: {}s, Rn220 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
-    ratio_est = np.divide(rn222_est,rn220_est)#.array(rn222_est)/np.array(rn220_est)
-    print("st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(ratio_est), np.std(ratio_est)))
+    print(
+        "st: {}s, tt: {}s, Rn222 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn222_est), np.std(rn222_est)))
+    print(
+        "st: {}s, tt: {}s, Rn220 => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(rn220_est), np.std(rn220_est)))
+    ratio_est = np.divide(rn222_est, rn220_est)  # .array(rn222_est)/np.array(rn220_est)
+    print(
+        "st: {}s, tt: {}s, ratio => mean: {:1.1f}, std: {:1.1f}".format(st, tt, np.mean(ratio_est), np.std(ratio_est)))
     rn222_mean[i][j] = np.mean(rn222_est)
     rn222_stdv[i][j] = np.std(rn222_est)
     rn220_mean[i][j] = np.mean(rn220_est)
@@ -192,46 +196,53 @@ def runtrial(st, tt, i, j):
 
 
 if __name__ == "__main__":
-    format = "%(asctime)s: %(message)s"
-    logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
-
-    n_period_grid = 15
-    n_period_start = 1
-    n_period_step = 1
-    n_time_grid = 109
-    n_time_start = 1 * 60
-    n_time_step = 5
-
-    rn222_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
-    rn222_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
-    rn220_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
-    rn220_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
-
-    jobs = [(i, (i % n_period_grid) * n_period_step + n_period_step, n_time_step * (i // n_period_grid) + n_time_start,
-             i % n_period_grid, i // n_period_grid) for i in range(n_time_grid * n_period_grid)]
-    threads = list()
-    for job in jobs:
-        logging.info("Main\t: create and start thread %d", job[0])
-        x = threading.Thread(target=runtrial_thread, args=(job,))
-        threads.append(x)
-        x.start()
-    for t in threads:
-        t.join()
-    with open("rn222_mean.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(rn222_mean)
-    with open("rn222_std.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(rn222_stdv)
-    with open("rn220_mean.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(rn220_mean)
-    with open("rn220_std.csv", "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(rn220_stdv)
-
-    sdprod = np.multiply(rn222_stdv, rn220_stdv)
-    i, j = np.unravel_index(np.argmin(sdprod), sdprod.shape)
-    print("Minimum std product found with period {} s and total sample duration {} s".format(i * n_period_step + n_period_step, j * n_time_step + n_time_start))
-    print("Radon-220 estimate at minimum: {:.3g} ± {:.3g}".format(rn220_mean[i][j], rn220_stdv[i][j]))
-    print("Radon-222 estimate at minimum: {:.3g} ± {:.3g}".format(rn222_mean[i][j], rn222_stdv[i][j]))
+    # format = "%(asctime)s: %(message)s"
+    # logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
+    #
+    # n_period_grid = 15
+    # n_period_start = 1
+    # n_period_step = 1
+    # n_time_grid = 109
+    # n_time_start = 1 * 60
+    # n_time_step = 5
+    #
+    # rn222_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
+    # rn222_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
+    # rn220_mean = [[0] * n_time_grid for _ in range(n_period_grid)]
+    # rn220_stdv = [[0] * n_time_grid for _ in range(n_period_grid)]
+    #
+    # jobs = [(i, (i % n_period_grid) * n_period_step + n_period_step, n_time_step * (i // n_period_grid) + n_time_start,
+    #          i % n_period_grid, i // n_period_grid) for i in range(n_time_grid * n_period_grid)]
+    # threads = list()
+    # for job in jobs:
+    #     logging.info("Main\t: create and start thread %d", job[0])
+    #     x = threading.Thread(target=runtrial_thread, args=(job,))
+    #     threads.append(x)
+    #     x.start()
+    # for t in threads:
+    #     t.join()
+    # with open("rn222_mean.csv", "w", newline="") as f:
+    #     writer = csv.writer(f)
+    #     writer.writerows(rn222_mean)
+    # with open("rn222_std.csv", "w", newline="") as f:
+    #     writer = csv.writer(f)
+    #     writer.writerows(rn222_stdv)
+    # with open("rn220_mean.csv", "w", newline="") as f:
+    #     writer = csv.writer(f)
+    #     writer.writerows(rn220_mean)
+    # with open("rn220_std.csv", "w", newline="") as f:
+    #     writer = csv.writer(f)
+    #     writer.writerows(rn220_stdv)
+    #
+    # sdprod = np.multiply(rn222_stdv, rn220_stdv)
+    # i, j = np.unravel_index(np.argmin(sdprod), sdprod.shape)
+    # print("Minimum std product found with period {} s and total sample duration {} s".format(i * n_period_step + n_period_step, j * n_time_step + n_time_start))
+    # print("Radon-220 estimate at minimum: {:.3g} ± {:.3g}".format(rn220_mean[i][j], rn220_stdv[i][j]))
+    # print("Radon-222 estimate at minimum: {:.3g} ± {:.3g}".format(rn222_mean[i][j], rn222_stdv[i][j]))
+    expected_rn222 = np.array(gen_inputs(3, 100, DC1Lambda, DC1AD, 30))
+    expected_rn222 = expected_rn222[:,0]
+    expected_rn220 = np.array(gen_inputs(3, 100, DC2Lambda, DC2AD, 30))
+    expected_rn220 = expected_rn220[:,0]
+    X = np.vstack((expected_rn220, expected_rn222)).transpose()
+    lr = np.matmul(np.linalg.inv(np.matmul(X.transpose(), X)), X.transpose())
+    print(lr)

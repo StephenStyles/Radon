@@ -2,12 +2,13 @@ clear;
 close all;
 
 t_s=15; % in seconds
-total_time = 60 * 15; % in seconds
-radon_level = 8000; % in pCi/L
+total_time = 60 * 5; % in seconds
+radon_level = 4; % in pCi/L
 num_runs = 10;
 
 t = 0:t_s:total_time;
 ns1 = radon_level * 3.7e-2 * 0.3 * t_s; 
+desired_activity = radon_level * 3.7e-2 * 0.3;
 
 % For Rn-222
 half_lives222=[3.825*24*60*60 3.05*60 26.8*60 19.9*60 164.3e-6];
@@ -18,11 +19,14 @@ for i = 1:length(t)
 end
 
 sum_counts222 = sum(counts222,2);
-%exp_counts222 = decay_counts(ns1/sum_counts222(1),t_s,length(t),half_lives222,alphas222);
-%exp_counts222 = exp_counts222./ns1;
-plot(t/60, sum_counts222./sum_counts222(1),'LineWidth',2,'DisplayName','Rn-222 Expected')
+n222 = desired_activity * half_lives222(1) / log(2);
+exp_counts222 = decay_counts(ns1/sum_counts222(1),t_s,length(t),half_lives222,alphas222);
+exp_counts222 = exp_counts222./ns1;%(n222*sum_counts222(1));
+plot(t/60, sum_counts222./sum_counts222(1),'--b','LineWidth',2,'DisplayName','Rn-222 Expected')
+f=gcf;
+f.Children.FontSize=40;
 hold on;
-%plot(t/60, exp_counts222,'LineWidth',2,'DisplayName','Rn-222 Simulated')
+plot(t/60, exp_counts222,'b','LineWidth',2,'DisplayName','Rn-222 Simulated')
 
 % For Rn-220
 half_lives220 = [54.5 0.158 10.64*60*60 60.55*60];
@@ -32,21 +36,21 @@ for i=1:length(t)
     counts220(i,:) = decay_interval(t(i), t(i)+t_s, half_lives220).*alphas220; 
 end
 sum_counts220 = sum(counts220,2);
-%exp_counts220 = decay_counts(ns1/sum_counts220(1),t_s,length(t),half_lives220,alphas220);
-%exp_counts220 = exp_counts220./ns1;
-plot(t/60, sum_counts220./sum_counts220(1),'LineWidth',2,'DisplayName','Rn-220 Expected')
-%plot(t/60, exp_counts220,'LineWidth',2,'DisplayName','Rn-220 Simulated')
+exp_counts220 = decay_counts(ns1/sum_counts220(1),t_s,length(t),half_lives220,alphas220);
+exp_counts220 = exp_counts220./ns1;
+plot(t/60, sum_counts220./sum_counts220(1),'--g','LineWidth',2,'DisplayName','Rn-220 Expected')
+plot(t/60, exp_counts220,'g','LineWidth',2,'DisplayName','Rn-220 Simulated')
 
-%exp_countsmix = decay_counts(0.5*ns1/sum_counts222(1),t_s,length(t),half_lives222,alphas222) + decay_counts(0.5*ns1/sum_counts220(1),t_s,length(t),half_lives220,alphas220);
-%exp_countsmix = exp_countsmix./ns1;
-for p =0.1:0.1:0.9
-    plot(t/60, p*sum_counts220./sum_counts220(1) + (1-p)*sum_counts222./sum_counts222(1),'LineWidth',2,'HandleVisibility','off')
+exp_countsmix = decay_counts(0.5*ns1/sum_counts222(1),t_s,length(t),half_lives222,alphas222) + decay_counts(0.5*ns1/sum_counts220(1),t_s,length(t),half_lives220,alphas220);
+exp_countsmix = exp_countsmix./ns1;
+for p =0.5:0.1:0.5
+    plot(t/60, p*sum_counts220./sum_counts220(1) + (1-p)*sum_counts222./sum_counts222(1),'--r','LineWidth',2,'DisplayName','Equal Activity Simulated')
 end
-%plot(t/60, exp_countsmix,'LineWidth',2,'DisplayName','Equal Activity Simulated')
-legend({},'FontSize',20)
-xlabel("Time (minutes)",'FontSize',20)
-ylabel("Alpha decay counts per sample period",'FontSize',20)
-title("Normalized expected count",'FontSize',20)
+plot(t/60, exp_countsmix,'r','LineWidth',2,'DisplayName','Equal Activity Simulated')
+%legend({},'FontSize',20)
+xlabel("Time (minutes)",'FontSize',40)
+ylabel("Alpha decay counts per sample period",'FontSize',40)
+%title("Normalized expected count",'FontSize',20)
 %title(sprintf("Activity: %d pCi/L",radon_level),'FontSize',20)
 % exp_countslpf = movmean(exp_countsmix,11);
 % plot(t/60, exp_countslpf)
