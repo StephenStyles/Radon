@@ -1,5 +1,7 @@
 
 *.asv
-*.jpg
 venv/*
 .idea/*
+*/venv*/*
+*/.idea/*
+*/__*/*
