@@ -1,0 +1,7 @@
+
+*.asv
+venv/*
+.idea/*
+*/venv*/*
+*/.idea/*
+*/__*/*

@@ -1,0 +1,172 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                          STANDARD PACKAGES                         %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+
+\usepackage{epstopdf}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsxtra}
+\usepackage{amscd}
+\usepackage{verbatim}
+\usepackage{rotating}
+\usepackage{multirow}
+\usepackage{multicol}
+\usepackage{url}
+\usepackage[margin=1.5in]{geometry}
+\usepackage[all]{xy}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                        STANDARD ENVIRONMENTS                       %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Theorems
+
+%Commented out this theorem style I  have no idea why it's even here - Erik
+%\theoremstyle{theorem}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{alphtheorem}{Theorem}
+\renewcommand{\thealphtheorem}{\Alph{alphtheorem}}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{guess}[theorem]{Conjecture}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{facts}[theorem]{Facts}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{problem}[theorem]{Problem}
+%\newtheorem{algorithm}[theorem]{Algorithm}
+%\newtheorem{claim}{Claim}[theorem]
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{subclaim}{Claim}[theorem]
+\renewcommand{\thesubclaim}{\thetheorem.\alph{subclaim}}
+\newtheorem{example}[theorem]{Example}
+%\newtheorem*{example*}{Example}
+\newtheorem{result}[theorem]{Result}
+\newtheorem{observation}[theorem]{Observation}
+\newtheorem{numconjecture}[theorem]{Conjecture}
+
+\newtheoremstyle{myexample}{3pt}{3pt}{}{}{\bfseries}{.}{ }{\thmname{#1}\thmnumber{ #2}\thmnote{ (#3)}}
+\theoremstyle{myexample}
+\newtheorem{numremark}[theorem]{Remark}
+
+\newtheoremstyle{myremark}{3pt}{3pt}{}{}{\bfseries}{.}{ }{\thmname{#1}\thmnote{ (#3)}}
+\theoremstyle{myremark}
+\newtheorem{remark}{Remark}
+\newtheorem*{remark*}{Remark}
+\newtheorem*{remarks*}{Remarks}
+\newtheorem*{observation*}{Observation}
+\newtheorem*{example*}{Example}
+
+\newtheoremstyle{conjecture}{3pt}{3pt}{\itshape}{}{\bfseries}{.}{ }{\thmname{#1}\thmnote{ (#3)}}
+%\newtheoremstyle{conjecture}{3pt}{3pt}{\rmfamily}{}{\itshape}{.}{ }{\thmname{#1}}
+\theoremstyle{conjecture}
+\newtheorem{question}{Question}
+\newtheorem*{question*}{Question}
+\newtheorem{conjecture}{Conjecture}
+\newtheorem{theorem*}{Theorem}
+
+
+\numberwithin{equation}{section}
+
+% References
+\newcommand{\genericref}[2]{#1~\ref{#2}}
+\newcommand{\generictworef}[3]{#1~\ref{#2} and \ref{#3}}
+\newcommand{\genericthreeref}[4]{#1~\ref{#2}, \ref{#3} and \ref{#4}}
+\newcommand{\thmref}[1]{\genericref{Theorem}{#1}}
+\newcommand{\lemmaref}[1]{\genericref{Lemma}{#1}}
+\newcommand{\claimref}[1]{\genericref{Claim}{#1}}
+\newcommand{\remarkref}[1]{\genericref{Remark}{#1}}
+\newcommand{\conjref}[1]{\genericref{Conjecture}{#1}}
+\newcommand{\tableref}[1]{\genericref{Table}{#1}}
+\newcommand{\figref}[1]{\genericref{Figure}{#1}}
+\newcommand{\twofigref}[2]{\generictworef{Figures}{#1}{#2}}
+\newcommand{\threefigref}[3]{\genericthreeref{Figures}{#1}{#2}{#3}}
+\newcommand{\propref}[1]{\genericref{Proposition}{#1}}
+\newcommand{\twopropref}[2]{\generictworef{Propositions}{#1}{#2}}
+
+% Case environment
+\newenvironment{genericcase}[6]{\medskip\par\noindent \csname#1\endcsname{#2 #3}#4 \csname#5\endcsname{#6}.\begin{indentation}{1.5em}{0em}\noindent\ignorespaces}{\end{indentation}}
+\newenvironment{case}[2]{\noindent \textit{Case #1}: #2.\begin{indentation}{1.5em}{0em}}{\end{indentation}}
+
+%Note that I changed  \textit{Subcase #1}. #2. to  \textit{Subcase #1}: #2.
+%Erik
+
+\newenvironment{subcase}[2]{\noindent \textit{Subcase #1}: #2.\begin{indentation}{1.5em}{0em}}{\end{indentation}}
+\newenvironment{ulindent}[1]{\noindent \underline{#1:}\begin{indentation}{1.5em}{0em}\setlength{\parindent}{0em}}{\end{indentation}}
+\newenvironment{bfcase}[1]{\par\medskip\begin{indentation}{1.5em}{0em}\noindent\hspace*{-1.5em}\textbf{#1:}}{\end{indentation}}
+\newenvironment{itcase}[1]{\par\medskip\begin{indentation}{1.5em}{0em}\noindent\hspace*{-1.5em}\textit{#1:}}{\end{indentation}}
+%\newcommand{\case}[2]{\noindent \textbf{Case #1}: #2:}
+
+% Induction environment
+\newenvironment{basecase}[1]{\noindent \textsc{Base case}: #1:\begin{indentation}{1.5em}{0em}}{\end{indentation}}
+\newenvironment{inductionstep}[1]{\noindent \textsc{Induction step}: #1:\begin{indentation}{1.5em}{0em}}{\end{indentation}}
+
+% Algorithm headers
+\newcounter{algorithm}
+\setcounter{algorithm}{0}
+\renewcommand{\thealgorithm}{\thesection.\arabic{algorithm}}
+\newenvironment{algorithm}[1]{%
+  \null
+  \refstepcounter{algorithm}%
+  \hrule%
+  \vspace{0.2em}%
+  \noindent\textbf{Algorithm \thealgorithm} #1
+  \vspace{0.2em}%
+  \hrule%
+  \vspace{0.2em}
+  }{%
+  \vspace{0.2em}%
+  \hrule%
+  \null
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                          STANDARD COMMANDS                         %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\ie}{i.e.}
+\newcommand{\eg}{e.g.} 
+\newcommand{\resp}{\emph{resp.\@\ }} 
+\newcommand{\etal}{et~al.} 
+\newcommand{\cf}{cf.}
+
+\newcommand{\mathbif}[1]{\mathbf{\emph{#1}}}
+\newcommand{\nth}[1]{\ensuremath{#1^{\textrm{th}}}}
+\newcommand{\nrd}[1]{\ensuremath{#1^{\textrm{rd}}}}
+\newcommand{\nst}[1]{\ensuremath{#1^{\textrm{st}}}}
+\newcommand{\jth}{\nth{j}}
+\newcommand{\kth}{\nth{k}}
+\newcommand{\qth}{\nth{q}}
+\newcommand{\rth}{\nth{r}}
+
+\newcommand{\vfrac}[2]{\ensuremath{{}^{\displaystyle#1} \diagup {}_{\displaystyle#2}}}
+
+\renewcommand{\pmod}[1]{\ \left({\rm mod\ } #1 \right)}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                      SAVING THEOREM NUMBERS                        %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\newcounter{temp}
+%\def\savecounter#1{\newcounter{#1}\setcounter{#1}{\value{theorem}}}
+%\def\changetheoremcounter#1{\setcounter{temp}{\value{theorem}}\setcounter{theorem}{\value{#1}}}%\csname the#1\endcsname}}
+%\def\restoretheoremcounter{\setcounter{theorem}{\value{temp}}}
+
+\newcounter{temp}
+\newcounter{ctemp}
+\def\savecounter#1#2{%
+   \newcounter{#1}%
+   \setcounter{#1}{\value{section}}%
+   \newcounter{#2}\setcounter{#2}{\value{theorem}}}
+\def\swapcounter#1#2{%
+   \setcounter{ctemp}{\value{section}}%
+   \setcounter{section}{\value{#1}}%
+   \setcounter{temp}{\value{theorem}}%
+   \setcounter{theorem}{\value{#2}}%
+   \addtocounter{theorem}{-1}}
+\def\restorecounter{%
+   \setcounter{section}{\thectemp}%
+   \setcounter{theorem}{\thetemp}}
